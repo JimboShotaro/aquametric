@@ -1,0 +1,156 @@
+// AquaMetric Protobuf Schema
+// センサーデータのバイナリ転送用フォーマット定義
+
+syntax = "proto3";
+
+package aquametric;
+
+option java_package = "com.aquametric.proto";
+option swift_prefix = "AQM";
+
+// ========================================
+// センサーデータ
+// ========================================
+
+// 1サンプルのセンサーデータ（100Hzで記録）
+message SensorSample {
+    // タイムスタンプ（ナノ秒、セッション開始からの経過時間）
+    int64 timestamp = 1;
+    
+    // 加速度センサー（m/s²）
+    float acc_x = 2;
+    float acc_y = 3;
+    float acc_z = 4;
+    
+    // ジャイロスコープ（rad/s）
+    float gyro_x = 5;
+    float gyro_y = 6;
+    float gyro_z = 7;
+    
+    // オプション：磁力計（μT）
+    optional float mag_x = 8;
+    optional float mag_y = 9;
+    optional float mag_z = 10;
+    
+    // オプション：気圧（hPa）
+    optional float pressure = 11;
+}
+
+// ========================================
+// セッションデータ
+// ========================================
+
+// 水泳セッションのメタデータ
+message SessionMetadata {
+    // セッションID（UUID形式）
+    string session_id = 1;
+    
+    // 開始時刻（Unix timestamp ミリ秒）
+    int64 start_time = 2;
+    
+    // 終了時刻（Unix timestamp ミリ秒）
+    int64 end_time = 3;
+    
+    // プール長（メートル）
+    int32 pool_length_m = 4;
+    
+    // デバイス情報
+    string device_type = 5;
+    string device_id = 6;
+    string firmware_version = 7;
+    
+    // サンプル数
+    int32 sample_count = 8;
+    
+    // サンプリングレート（Hz）
+    int32 sampling_rate_hz = 9;
+}
+
+// 完全なセッションデータ（メタデータ + サンプル）
+message SwimSession {
+    SessionMetadata metadata = 1;
+    repeated SensorSample samples = 2;
+}
+
+// ========================================
+// 同期プロトコル
+// ========================================
+
+// 同期リクエスト（スマホ → 腕時計）
+message SyncRequest {
+    enum Command {
+        LIST_SESSIONS = 0;      // 未同期セッション一覧を要求
+        GET_SESSION = 1;        // 特定セッションのデータを要求
+        DELETE_SESSION = 2;     // セッションを削除
+        GET_DEVICE_INFO = 3;    // デバイス情報を要求
+    }
+    
+    Command command = 1;
+    optional string session_id = 2;  // GET_SESSION, DELETE_SESSION で使用
+}
+
+// 同期レスポンス（腕時計 → スマホ）
+message SyncResponse {
+    enum Status {
+        SUCCESS = 0;
+        ERROR = 1;
+        NOT_FOUND = 2;
+        IN_PROGRESS = 3;
+    }
+    
+    Status status = 1;
+    optional string error_message = 2;
+    
+    // コマンドに応じたペイロード
+    oneof payload {
+        SessionList session_list = 3;
+        SwimSession session_data = 4;
+        DeviceInfo device_info = 5;
+    }
+}
+
+// セッション一覧
+message SessionList {
+    repeated SessionMetadata sessions = 1;
+}
+
+// デバイス情報
+message DeviceInfo {
+    string device_id = 1;
+    string device_name = 2;
+    string firmware_version = 3;
+    int32 battery_level = 4;  // 0-100%
+    int64 last_sync_time = 5;
+    int32 pending_sessions_count = 6;
+}
+
+// ========================================
+// BLE Characteristic データ
+// ========================================
+
+// BLE経由のデータ転送チャンク
+// MTUサイズに合わせて分割転送
+message DataChunk {
+    // チャンクシーケンス番号
+    int32 sequence = 1;
+    
+    // 総チャンク数
+    int32 total_chunks = 2;
+    
+    // セッションID
+    string session_id = 3;
+    
+    // データペイロード（最大512バイト）
+    bytes data = 4;
+    
+    // CRC32チェックサム
+    uint32 checksum = 5;
+}
+
+// 転送完了確認
+message TransferAck {
+    string session_id = 1;
+    int32 received_chunks = 2;
+    bool complete = 3;
+    repeated int32 missing_sequences = 4;  // 再送が必要なチャンク
+}

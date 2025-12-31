@@ -1,0 +1,40 @@
+# SwimBIT Algorithm Configuration
+# Based on ISWC 2019 Paper specifications
+
+# Sampling Configuration
+sampling:
+  frequency_hz: 100  # 100Hz sampling rate as specified in SwimBIT
+  
+# Low-pass Filter Configuration
+filter:
+  type: "fir"
+  window: "hamming"
+  order: 48           # 48-order FIR filter
+  cutoff_hz: 3.0      # 3Hz cutoff frequency
+
+# Stroke Classification Thresholds
+classifier:
+  thresholds:
+    butterfly_x_energy: 15.0
+    backstroke_gravity_z: 5.0
+    freestyle_y_energy_ratio: 1.2
+    breaststroke_energy_max: 12.0
+  
+# Segmentation Configuration (Turn/Lap Detection)
+segmentation:
+  min_turn_duration_ms: 1500
+  min_lap_duration_sec: 10
+  max_lap_duration_sec: 120
+  pool_length_m: 25
+
+# Post-processing Configuration
+postprocessing:
+  smooth_nulls:
+    probability: 0.5
+    time_low: 1
+    close_size_1: 90   # 3 * 30Hz
+    open_size_1: 270   # 9 * 30Hz
+    close_size_2: 750  # 25 * 30Hz
+  smooth_turns:
+    min_lane: 750      # 25 * 30Hz
+    max_lane: 2250     # 75 * 30Hz
